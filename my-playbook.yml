@@ -1,0 +1,49 @@
+---
+- name: prepare WEB server
+  hosts: WEB
+  become: yes
+  tasks:
+  - name: tomcat is present
+    apt:
+      name: tomcat8
+      state: present
+      update_cache: yes
+  - name: tomcat is started
+    service:
+      name: tomcat8
+      state: started
+
+- name: prepare stage server
+  hosts: STAGE
+  become: yes
+  tasks:
+  - name: java is present
+    apt:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - default-jdk
+      - git
+      - maven
+  - name: create dir for project
+    file:
+      path: /tmp/app_data
+      state: directory
+  - name: clone project
+    git:
+      repo: https://github.com/boxfuse/boxfuse-sample-java-war-hello.git
+      dest: /tmp/app_data
+  - name: create app
+    shell:
+      mvn package -f /tmp/app_data
+- name: Copy app to WEB server
+  hosts: STAGE
+  become: yes
+  tasks:
+  - name: Copy app to WEB server
+    synchronize:
+      src: /tmp/app_data/target/hello-1.0.war
+      dest: /var/lib/tomcat8/webapps
+      mode: pull
+    delegate_to: WEB_01
+    run_once: true
